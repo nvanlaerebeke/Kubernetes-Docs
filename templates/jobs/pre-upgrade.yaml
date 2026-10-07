@@ -1,4 +1,4 @@
-{{- if .Values.upgrade.job.enabled }}
+{{- if and .Values.upgrade.job.enabled .Release.IsUpgrade }}
 apiVersion: batch/v1
 kind: Job
 metadata:
