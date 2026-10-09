@@ -12,6 +12,48 @@ Check the DB type
 {{- end -}}
 
 {{/*
+Validate editor storage modes and their Redis topology requirements.
+*/}}
+{{- define "ds.editor.storage.validate" -}}
+{{- $allowed := list "memory" "standalone" "sentinel" "cluster" -}}
+{{- $dataStorage := default "memory" .Values.editorDataStorage -}}
+{{- $statStorage := default "memory" .Values.editorStatStorage -}}
+{{- if not (has $dataStorage $allowed) -}}
+  {{- fail (printf "Unsupported editorDataStorage %q. Possible values are memory, standalone, sentinel or cluster." $dataStorage) -}}
+{{- end -}}
+{{- if not (has $statStorage $allowed) -}}
+  {{- fail (printf "Unsupported editorStatStorage %q. Possible values are memory, standalone, sentinel or cluster." $statStorage) -}}
+{{- end -}}
+{{- if and (ne $dataStorage "memory") (ne $statStorage "memory") (ne $dataStorage $statStorage) -}}
+  {{- fail "editorDataStorage and editorStatStorage must use the same Redis topology when both are not memory." -}}
+{{- end -}}
+{{- $redisStorage := $dataStorage -}}
+{{- if eq $redisStorage "memory" -}}
+  {{- $redisStorage = $statStorage -}}
+{{- end -}}
+{{- if eq $redisStorage "sentinel" -}}
+  {{- if not .Values.connections.redisSentinelNodes -}}
+    {{- fail "Redis Sentinel editor storage requires connections.redisSentinelNodes." -}}
+  {{- end -}}
+  {{- if .Values.connections.redisClusterNodes -}}
+    {{- fail "Redis Sentinel editor storage cannot be combined with connections.redisClusterNodes." -}}
+  {{- end -}}
+{{- else if eq $redisStorage "cluster" -}}
+  {{- if not .Values.connections.redisClusterNodes -}}
+    {{- fail "Redis Cluster editor storage requires connections.redisClusterNodes." -}}
+  {{- end -}}
+  {{- if .Values.connections.redisSentinelNodes -}}
+    {{- fail "Redis Cluster editor storage cannot be combined with connections.redisSentinelNodes." -}}
+  {{- end -}}
+{{- else if eq $redisStorage "standalone" -}}
+  {{- if or .Values.connections.redisClusterNodes .Values.connections.redisSentinelNodes -}}
+    {{- fail "Standalone editor storage cannot be combined with Redis Cluster or Sentinel nodes." -}}
+  {{- end -}}
+{{- end -}}
+true
+{{- end -}}
+
+{{/*
 Get the DB password secret
 */}}
 {{- define "ds.db.secretName" -}}
