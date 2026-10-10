@@ -87,11 +87,9 @@ This repository contains a set of files to deploy Euro-Office Docs into a Kubern
 $ helm repo add bitnami https://charts.bitnami.com/bitnami
 $ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 $ helm repo add nfs-server-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner
+$ helm repo add euro-office https://download.euro-office.com/charts/stable
 $ helm repo update
 ```
-
-The Euro-Office Docs chart is published as an OCI artifact in GitHub Container
-Registry. Use `oci://ghcr.io/euro-office/charts/docs` in the Helm commands below.
 
 ### 2. Install Persistent Storage
 
@@ -275,8 +273,8 @@ Note: Any name can be used instead of `local-config`.
 When installing Euro-Office Docs, specify the `extraConf.configMap=local-config` and `extraConf.filename=local.json` parameters
 
 Note: If you need to add a configuration file after the Euro-Office Docs is already installed, you need to execute step [7.1](#71-create-a-configmap-containing-a-json-file) 
-and then run the `helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs --set extraConf.configMap=local-config --set extraConf.filename=local.json --no-hooks` command or
-`helm upgrade documentserver -f ./values.yaml oci://ghcr.io/euro-office/charts/docs --no-hooks` if the parameters are specified in the `values.yaml` file.
+and then run the `helm upgrade documentserver euro-office/docs --set extraConf.configMap=local-config --set extraConf.filename=local.json --no-hooks` command or 
+`helm upgrade documentserver -f ./values.yaml euro-office/docs --no-hooks` if the parameters are specified in the `values.yaml` file.
 
 ### 8. Add custom Fonts
 
@@ -318,8 +316,8 @@ Note: Instead of `custom-themes` and `custom-themes.json` you can use any other 
 When installing Euro-Office Docs, specify the `extraThemes.configMap=custom-themes` and `extraThemes.filename=custom-themes.json` parameters.
 
 Note: If you need to add interface themes after the Euro-Office Docs is already installed, you need to execute step [11.1](#111-create-a-configmap-containing-a-json-file)
-and then run the `helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs --set extraThemes.configMap=custom-themes --set extraThemes.filename=custom-themes.json --no-hooks` command or
-`helm upgrade documentserver -f ./values.yaml oci://ghcr.io/euro-office/charts/docs --no-hooks` if the parameters are specified in the `values.yaml` file.
+and then run the `helm upgrade documentserver euro-office/docs --set extraThemes.configMap=custom-themes --set extraThemes.filename=custom-themes.json --no-hooks` command or
+`helm upgrade documentserver -f ./values.yaml euro-office/docs --no-hooks` if the parameters are specified in the `values.yaml` file.
 
 ### 12. Connecting Amazon S3 bucket as a cache to Euro-Office Helm Docs
 In order to connect Amazon S3 bucket as a cache, you need to [create](#7-make-changes-to-node-config-configuration-files) a configuration file or edit the existing one in accordance with [this guide](https://helpcenter.euro-office.com/ru/installation/docs-connect-amazon.aspx) and change the value of the parameter `persistence.storageS3` to `true`. 
@@ -347,17 +345,17 @@ Note: If the installation is performed without creating a secret with the existi
 When installing Euro-Office Docs, specify the `license.existingSecret=[SECRET_LICENSE_NAME]` parameter.
 
 ```
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set license.existingSecret=[SECRET_LICENSE_NAME]
+$ helm install documentserver euro-office/docs --set license.existingSecret=[SECRET_LICENSE_NAME]
 ```
 
-Note: If you need to add license after the Euro-Office Docs is already installed, you need to execute step [1.1](#11-create-secret) and then run the `helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs --set license.existingSecret=[SECRET_LICENSE_NAME] --no-hooks` command or `helm upgrade documentserver -f ./values.yaml oci://ghcr.io/euro-office/charts/docs --no-hooks` if the parameters are specified in the `values.yaml` file.
+Note: If you need to add license after the Euro-Office Docs is already installed, you need to execute step [1.1](#11-create-secret) and then run the `helm upgrade documentserver euro-office/docs --set license.existingSecret=[SECRET_LICENSE_NAME] --no-hooks` command or `helm upgrade documentserver -f ./values.yaml euro-office/docs --no-hooks` if the parameters are specified in the `values.yaml` file.
 
 ### 2. Deploy Euro-Office Docs
 
 To deploy Euro-Office Docs with the release name `documentserver`:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs
+$ helm install documentserver euro-office/docs
 ```
 
 The command deploys Euro-Office Docs on the Kubernetes cluster in the default configuration. The [Parameters](#4-parameters) section lists the parameters that can be configured during installation.
@@ -393,6 +391,8 @@ The `helm delete` command removes all the Kubernetes components associated with 
 
 | Parameter                                                   | Description                                                                                                                                                                    | Default                                                                                   |
 |-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| `editorDataStorage`                                         | Editor data storage mode. Possible values are `memory`, `standalone`, `sentinel` or `cluster`. Redis-backed modes select `editorDataRedis`.                                     | `memory`                                                                                  |
+| `editorStatStorage`                                         | Editor statistics storage mode. Possible values are `memory`, `standalone`, `sentinel` or `cluster`. Redis-backed modes select `editorDataRedis`.                              | `memory`                                                                                  |
 | `connections.dbType`                                        | The database type. Possible values are `postgres`, `mariadb`, `mysql`, `oracle`, `mssql` or `dameng`                                                                           | `postgres`                                                                                |
 | `connections.dbHost`                                        | The IP address or the name of the Database host                                                                                                                                | `postgresql`                                                                              |
 | `connections.dbUser`                                        | Database user                                                                                                                                                                  | `postgres`                                                                                |
@@ -401,8 +401,7 @@ The `helm delete` command removes all the Kubernetes components associated with 
 | `connections.dbPassword`                                    | Database user password. If set to, it takes priority over the `connections.dbExistingSecret`                                                                                   | `""`                                                                                      |
 | `connections.dbSecretKeyName`                               | The name of the key that contains the Database user password                                                                                                                   | `postgres-password`                                                                       |
 | `connections.dbExistingSecret`                              | Name of existing secret to use for Database passwords. Must contain the key specified in `connections.dbSecretKeyName`                                                         | `postgresql`                                                                              |
-| `connections.redisConnectorName`                            | Defines which connector to use to connect to Redis. If you need to connect to Redis Sentinel, set the value `ioredis`                                                          | `redis`                                                                                   |
-| `connections.redistHost`                                    | The IP address or the name of the Redis host. Not used if the values are set in `connections.redisClusterNodes` and `connections.redisSentinelNodes`                           | `redis-master`                                                                            |
+| `connections.redisHost`                                     | The IP address or the name of the Redis host. Not used if the values are set in `connections.redisClusterNodes` and `connections.redisSentinelNodes`                           | `redis-master`                                                                            |
 | `connections.redisPort`                                     | The Redis server port number. Not used if the values are set in `connections.redisClusterNodes` and `connections.redisSentinelNodes`                                           | `6379`                                                                                    |
 | `connections.redisUser`                                     | The Redis [user](https://redis.io/docs/management/security/acl/) name. Ignored when `connections.redisNoPass=true`. The value overrides `options` in `local.json` if you add a custom configuration file | `default`                                                        |
 | `connections.redisDBNum`                                    | Number of the redis logical database to be [selected](https://redis.io/commands/select/). The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file | `0`                                           |
@@ -411,11 +410,12 @@ The `helm delete` command removes all the Kubernetes components associated with 
 | `connections.redisSecretKeyName`                            | The name of the key that contains the Redis user password                                                                                                                      | `redis-password`                                                                          |
 | `connections.redisExistingSecret`                           | Name of existing secret to use for Redis passwords. Must contain the key specified in `connections.redisSecretKeyName`. The password from this secret overrides password set in the `options` object in `local.json` | `redis`                                             |
 | `connections.redisNoPass`                                   | Defines whether to connect without Redis authentication. If the Redis server does not require a password, set this to `true`; the chart will omit the Redis username as well | `false`                                                                                   |
-| `connections.redisSentinelNodes`                            | List of Redis Sentinel Nodes. There is no need to specify every node, 3 should be enough. You can specify multiple values. It must be specified in the `host:port` format. Used if `connections.redisConnectorName` is set to `ioredis` | `[]`                             |
-| `connections.redisSentinelGroupName`                        | Name of a group of Redis instances composed of a master and one or more slaves. Used if `connections.redisConnectorName` is set to `ioredis`                                   | `mymaster`                                                                                |
-| `connections.redisSentinelExistingSecret`                   | Name of existing secret to use for Redis Sentinel password. Must contain the key specified in `connections.redisSentinelSecretKeyName`. The password from this secret overrides the value for the password set in the `iooptions` object in `local.json` | ""              |
+| `connections.redisSentinelNodes`                            | List of Redis Sentinel Nodes. Sentinel mode is enabled when this list is non-empty. There is no need to specify every node, 3 should be enough. It must use the `host:port` format | `[]`                             |
+| `connections.redisSentinelGroupName`                        | Name of the Sentinel-monitored Redis group.                                                                                                                                    | `mymaster`                                                                                |
+| `connections.redisSentinelUser`                             | Redis Sentinel user name.                                                                                                                                                      | `""`                                                                                     |
+| `connections.redisSentinelExistingSecret`                   | Name of existing secret to use for Redis Sentinel password. Must contain the key specified in `connections.redisSentinelSecretKeyName`. The password overrides `optionsSentinel` in `local.json` | `""`              |
 | `connections.redisSentinelSecretKeyName`                    | The name of the key that contains the Redis Sentinel user password. If you set a password in `redisSentinelPassword`, a secret will be automatically created, the key name of which will be the value set here | `sentinel-password`                                       |
-| `connections.redisSentinelPassword`                         | The password set for the Redis Sentinel account. If set to, it takes priority over the `connections.redisSentinelExistingSecret`. The value in this parameter overrides the value set in the `iooptions` object in `local.json` | `""`                                     |
+| `connections.redisSentinelPassword`                         | The password set for the Redis Sentinel account. If set, it takes priority over `connections.redisSentinelExistingSecret` and overrides the `optionsSentinel` password in `local.json` | `""`                                     |
 | `connections.redisSentinelNoPass`                           | Defines whether to use a Redis Sentinel auth without a password. If the connection to Redis Sentinel does not require a password, set the value to `true`                      | `true`                                                                                    |
 | `connections.amqpType`                                      | Defines the AMQP server type. Possible values are `rabbitmq` or `activemq`                                                                                                     | `rabbitmq`                                                                                |
 | `connections.amqpHost`                                      | The IP address or the name of the AMQP server                                                                                                                                  | `rabbitmq`                                                                                |
@@ -847,7 +847,7 @@ The `helm delete` command removes all the Kubernetes components associated with 
 Specify each parameter using the `--set key=value[,key=value]` argument to helm install. For example,
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set ingress.enabled=true,ingress.ssl.enabled=true,ingress.host=example.com
+$ helm install documentserver euro-office/docs --set ingress.enabled=true,ingress.ssl.enabled=true,ingress.host=example.com
 ```
 
 This command gives expose Euro-Office Docs via HTTPS.
@@ -855,7 +855,7 @@ This command gives expose Euro-Office Docs via HTTPS.
 Alternatively, a YAML file that specifies the values for the parameters can be provided while installing the chart. For example,
 
 ```bash
-$ helm install documentserver -f values.yaml oci://ghcr.io/euro-office/charts/docs
+$ helm install documentserver -f values.yaml euro-office/docs
 ```
 
 > **Tip**: You can use the default [values.yaml](values.yaml)
@@ -867,20 +867,20 @@ $ helm install documentserver -f values.yaml oci://ghcr.io/euro-office/charts/do
 To deploy the example, set the `example.enabled` parameter to true:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set example.enabled=true
+$ helm install documentserver euro-office/docs --set example.enabled=true
 ```
 
 ### 5.2 Metrics deployment (optional)
 To deploy metrics, set `metrics.enabled` to true:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set metrics.enabled=true
+$ helm install documentserver euro-office/docs --set metrics.enabled=true
 ```
 
 If you want to use Grafana to visualize metrics, set `grafana.enabled` to `true`. If you want to use Nginx Ingress to access Grafana, set `grafana.ingress.enabled` to `true`:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set grafana.enabled=true --set grafana.ingress.enabled=true
+$ helm install documentserver euro-office/docs --set grafana.enabled=true --set grafana.ingress.enabled=true
 ```
 
 ### 5.3 Expose Euro-Office Docs
@@ -895,7 +895,7 @@ Use this type of exposure if you use external TLS termination, and don't have an
 To expose Euro-Office Docs via service, set the `service.type` parameter to LoadBalancer:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set service.type=LoadBalancer,service.port=80
+$ helm install documentserver euro-office/docs --set service.type=LoadBalancer,service.port=80
 
 ```
 
@@ -944,7 +944,7 @@ Use this type if you use external TLS termination and when you have several WEB 
 To expose Euro-Office Docs via ingress HTTP, set the `ingress.enabled` parameter to true:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set ingress.enabled=true
+$ helm install documentserver euro-office/docs --set ingress.enabled=true
 ```
 
 Run the following command to get the `documentserver` ingress IP:
@@ -978,7 +978,7 @@ $ kubectl create secret generic tls \
 ```
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set ingress.enabled=true,ingress.ssl.enabled=true,ingress.host=example.com
+$ helm install documentserver euro-office/docs --set ingress.enabled=true,ingress.ssl.enabled=true,ingress.host=example.com
 
 ```
 
@@ -1019,7 +1019,7 @@ This type of exposure allows you to expose Euro-Office Docs on a virtual path, f
 To expose Euro-Office Docs via ingress on a virtual path, set the `ingress.enabled`, `ingress.host` and `ingress.path` parameters.
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set ingress.enabled=true,ingress.host=your-domain-name,ingress.path=/docs
+$ helm install documentserver euro-office/docs --set ingress.enabled=true,ingress.host=your-domain-name,ingress.path=/docs
 ```
 
 The list of supported ingress controllers for virtual path configuration:
@@ -1037,7 +1037,7 @@ This type of exposure allows you to expose Euro-Office Docs via route in OpenShi
 To deploy the Admin Panel, set the `adminpanel.enabled` parameter to true:
 
 ```bash
-$ helm install documentserver oci://ghcr.io/euro-office/charts/docs --set adminpanel.enabled=true
+$ helm install documentserver euro-office/docs --set adminpanel.enabled=true
 ```
 
 For first authorization, use the secret value `Bootstrap code`. You can find it by opening the adminpanel Pod log. The `Bootstrap code` is valid for 1 hour.
@@ -1088,7 +1088,7 @@ $ kubectl scale -n default deployment converter --replicas=POD_COUNT
 It's necessary to set the parameters for updating. For example,
 
 ```bash
-$ helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs \
+$ helm upgrade documentserver euro-office/docs \
   --set images.tag=[version]
 ```
 
@@ -1097,14 +1097,14 @@ $ helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs \
 Or modify the values.yaml file and run the command:
 
 ```bash
-$ helm upgrade documentserver -f values.yaml oci://ghcr.io/euro-office/charts/docs
+$ helm upgrade documentserver -f values.yaml euro-office/docs
 ```
 
 Running the helm upgrade command runs a hook that shuts down the Euro-Office Docs and cleans up the database. This is needed when updating the version of Euro-Office Docs. The default hook execution time is 300s.
 The execution time can be changed using --timeout [time], for example
 
 ```bash
-$ helm upgrade documentserver -f values.yaml oci://ghcr.io/euro-office/charts/docs --timeout 15m
+$ helm upgrade documentserver -f values.yaml euro-office/docs --timeout 15m
 ```
 
 Note: When upgrading Euro-Office Docs in a private k8s cluster behind a Web proxy or with no internet access, see the [notes](#11-run-jobs-in-a-private-k8s-cluster-optional) below.
@@ -1112,7 +1112,7 @@ Note: When upgrading Euro-Office Docs in a private k8s cluster behind a Web prox
 If you want to update any parameter other than the version of the Euro-Office Docs, then run the `helm upgrade` command without `hooks`, for example:
 
 ```bash
-$ helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs --set jwt.enabled=false --no-hooks
+$ helm upgrade documentserver euro-office/docs --set jwt.enabled=false --no-hooks
 ```
 
 To rollback updates, run the following command:
@@ -1291,7 +1291,7 @@ $ helm install grafana --version 12.1.8 bitnami/grafana \
 #### 1.2.1 Installing ready-made Grafana dashboards
 
 To install ready-made Grafana dashboards, set the `grafana.enabled` and `grafana.dashboard.enabled` parameters to `true`.
-If Euro-Office Docs is already installed you need to run the `helm upgrade documentserver oci://ghcr.io/euro-office/charts/docs --set grafana.enabled=true --set grafana.dashboard.enabled=true` command or `helm upgrade documentserver -f ./values.yaml oci://ghcr.io/euro-office/charts/docs` if the parameters are specified in the [values.yaml](values.yaml) file.
+If Euro-Office Docs is already installed you need to run the `helm upgrade documentserver euro-office/docs --set grafana.enabled=true --set grafana.dashboard.enabled=true` command or `helm upgrade documentserver -f ./values.yaml euro-office/docs` if the parameters are specified in the [values.yaml](values.yaml) file.
 As a result, ready-made dashboards in the `JSON` format will be downloaded from the Grafana [website](https://grafana.com/grafana/dashboards),
 the necessary edits will be made to them and configmap will be created from them. A dashboard will also be added to visualize metrics coming from the Euro-Office Docs (it is assumed that step [#6](#6-deploy-statsd-exporter) has already been completed).
 

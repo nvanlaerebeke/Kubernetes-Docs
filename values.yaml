@@ -5,6 +5,13 @@
 product:
   name: euro-office
 
+## Editor data and statistics storage
+## `memory` keeps the application defaults. The Redis-backed modes select
+## `editorDataRedis` and also declare the Redis topology to use.
+## Possible values are `memory`, `standalone`, `sentinel` or `cluster`.
+editorDataStorage: memory
+editorStatStorage: memory
+
 ## Onlyoffice Docs common parameters
 ## This block defines common parameters for all resources
 ##
@@ -31,9 +38,6 @@ connections:
   ## connections.dbPassword Database user password
   ## If set to, it takes priority over the `connections.dbExistingSecret`
   dbPassword: ""
-  ## connections.redisConnectorName Defines which connector to use to connect to Redis
-  ## If you need to connect to Redis Sentinel, set the value `ioredis`
-  redisConnectorName: redis
   ## connections.redisHost The IP address or the name of the Redis host
   ## Not used if the values are set in `connections.redisClusterNodes` and `connections.redisSentinelNodes`
   redisHost: redis-master
@@ -77,25 +81,27 @@ connections:
   ## There is no need to specify every node, 3 should be enough
   ## You can specify multiple values
   ## It must be specified in the `host:port` format
-  ## Used if `connections.redisConnectorName` is set to `ioredis`
   ## Example:
   ## redisSentinelNodes:
   ## - 10.244.0.79:26379
   ## - 192.168.1.25:26379
   redisSentinelNodes: []
   ## connections.redisSentinelGroupName Name of a group of Redis instances composed of a master and one or more slaves
-  ## Used if `connections.redisConnectorName` is set to `ioredis`
+  ## Redis Sentinel is enabled when `connections.redisSentinelNodes` is not empty
   redisSentinelGroupName: mymaster
+  ## connections.redisSentinelUser The Redis Sentinel user name
+  ## Used when `connections.redisSentinelNodes` is not empty
+  redisSentinelUser: ""
   ## connections.redisSentinelExistingSecret Name of existing secret to use for Redis Sentinel password
   ## Must contain the key specified in `connections.redisSentinelSecretKeyName`
-  ## The password from this secret overrides the value for the password set in the `iooptions` object in `local.json` if you add custom configuration file
+  ## The password from this secret overrides the value for the password set in the `optionsSentinel` object in `local.json` if you add custom configuration file
   redisSentinelExistingSecret: ""
   ## connections.redisSentinelSecretKeyName The name of the key that contains the Redis Sentinel user password
   ## If you set a password in `redisSentinelPassword`, a secret will be automatically created, the key name of which will be the value set here
   redisSentinelSecretKeyName: sentinel-password
   ## connections.redisSentinelPassword The password set for the Redis Sentinel account
   ## If set to, it takes priority over the `connections.redisSentinelExistingSecret`
-  ## The value in this parameter overrides the value set in the `iooptions` object in `local.json` if you add custom configuration file
+  ## The value in this parameter overrides the value set in the `optionsSentinel` object in `local.json` if you add custom configuration file
   redisSentinelPassword: ""
   ## connections.redisSentinelNoPass Defines whether to use a Redis Sentinel auth without a password
   ## If the connection to Redis Sentinel does not require a password, set the value to `true`
