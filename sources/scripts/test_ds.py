@@ -7,10 +7,10 @@ import logging
 redisHost = os.environ.get('REDIS_SERVER_HOST')
 redisPort = os.environ.get('REDIS_SERVER_PORT')
 redisUser = os.environ.get('REDIS_SERVER_USER')
-redisPassword = os.environ.get('REDIS_SERVER_PASS')
+redisPassword = os.environ.get('REDIS_SERVER_PWD')
 redisSentinelUser = os.environ.get('REDIS_SENTINEL_USER')
-redisSentinelPassword = os.environ.get('REDIS_SENTINEL_PASS')
-redisDBNum = os.environ.get('REDIS_SERVER_DB')
+redisSentinelPassword = os.environ.get('REDIS_SENTINEL_PWD')
+redisDBNum = os.environ.get('REDIS_SERVER_DB_NUM')
 redisConnectTimeout = 15
 if os.environ.get('REDIS_CLUSTER_NODES'):
     redisClusterNodes = list(os.environ.get('REDIS_CLUSTER_NODES').split(" "))
@@ -367,7 +367,7 @@ def total_status():
     logger_test_ds.info('As a result of the check, the following results were obtained:')
     for key, value in total_result.items():
         logger_test_ds.info(f'{key} = {value}')
-    if total_result['CheckDS'] != 'Success':
+    if any(value != 'Success' for value in total_result.values()):
         sys.exit(1)
 
 
