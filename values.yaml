@@ -39,14 +39,15 @@ connections:
   ## If set to, it takes priority over the `connections.dbExistingSecret`
   dbPassword: ""
   ## connections.redisHost The IP address or the name of the Redis host
-  ## Not used if the values are set in `connections.redisClusterNodes` and `connections.redisSentinelNodes`
+  ## Used for standalone Redis and as the startup/readiness fallback when a topology is configured.
+  ## In Sentinel mode, set this to a reachable fallback endpoint; Sentinel discovery uses redisSentinelNodes.
   redisHost: redis-master
   ## connections.redisPort The Redis server port number
-  ## Not used if the values are set in `connections.redisClusterNodes` and `connections.redisSentinelNodes`
+  ## Used with connections.redisHost for the standalone/startup fallback endpoint.
   redisPort: "6379"
   ## connections.redisUser The Redis user name
   ## ref: https://redis.io/docs/management/security/acl/
-  ## Ignored when `connections.redisNoPass` is `true`
+  ## Omit Redis authentication by setting connections.redisNoPass to true.
   ## The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file
   redisUser: default
   ## connections.redisDBNum Number of the redis logical database to be selected
@@ -90,7 +91,7 @@ connections:
   ## Redis Sentinel is enabled when `connections.redisSentinelNodes` is not empty
   redisSentinelGroupName: mymaster
   ## connections.redisSentinelUser The Redis Sentinel user name
-  ## Used when `connections.redisSentinelNodes` is not empty
+  ## Required together with a password when Sentinel ACL authentication is enabled.
   redisSentinelUser: ""
   ## connections.redisSentinelExistingSecret Name of existing secret to use for Redis Sentinel password
   ## Must contain the key specified in `connections.redisSentinelSecretKeyName`
@@ -104,7 +105,7 @@ connections:
   ## The value in this parameter overrides the value set in the `optionsSentinel` object in `local.json` if you add custom configuration file
   redisSentinelPassword: ""
   ## connections.redisSentinelNoPass Defines whether to use a Redis Sentinel auth without a password
-  ## If the connection to Redis Sentinel does not require a password, set the value to `true`
+  ## If Sentinel does not require ACL authentication, set the value to `true`; the Sentinel user and password are then omitted.
   redisSentinelNoPass: true
   ## connections.amqpType Defines the AMQP server type
   ## Possible values are `rabbitmq` or `activemq`

@@ -94,18 +94,7 @@ spec:
         args:
         - adminpanel
         env:
-        - name: REDIS_SERVER_PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ template "ds.redis.secretName" . }}
-              key: {{ .Values.connections.redisSecretKeyName }}
-        {{- if .Values.connections.redisSentinelNodes }}
-        - name: REDIS_SENTINEL_PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ template "ds.redis.sentinel.secretName" . }}
-              key: {{ .Values.connections.redisSentinelSecretKeyName }}
-        {{- end }}
+        {{ include "ds.redis.env" . | nindent 8 }}
         {{- with .Values.adminpanel.extraEnvVars }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
