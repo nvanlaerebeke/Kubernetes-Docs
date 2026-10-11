@@ -42,6 +42,7 @@ connections:
   redisPort: "6379"
   ## connections.redisUser The Redis user name
   ## ref: https://redis.io/docs/management/security/acl/
+  ## Ignored when `connections.redisNoPass` is `true`
   ## The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file
   redisUser: default
   ## connections.redisDBNum Number of the redis logical database to be selected
