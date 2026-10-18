@@ -43,6 +43,7 @@ connections:
   redisTLS: false
   ## connections.redisUser The Redis user name
   ## ref: https://redis.io/docs/management/security/acl/
+  ## Defaults to `default`; set to "" for password-only authentication (no protocol username, authenticates as default).
   ## Omit Redis authentication by setting connections.redisNoPass to true.
   ## The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file
   redisUser: default
@@ -71,8 +72,8 @@ connections:
   ## If set to, it takes priority over the `connections.redisExistingSecret`
   ## The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file
   redisPassword: ""
-  ## connections.redisNoPass Defines whether to use a Redis auth without a password
-  ## If the connection to Redis server does not require a password, set the value to `true`
+  ## connections.redisNoPass Omit Redis-node credentials when true, independently of Sentinel authentication.
+  ## When false, a password or existing password secret is required; the username is optional.
   redisNoPass: false
   ## connections.redisSentinelNodes: List of Redis Sentinel Nodes
   ## There is no need to specify every node, 3 should be enough
@@ -90,7 +91,8 @@ connections:
   ## Requires a DocumentServer image supporting REDIS_SENTINEL_TLS. Ports remain unchanged.
   redisSentinelTLS: false
   ## connections.redisSentinelUser The Redis Sentinel user name
-  ## Required together with a password when Sentinel ACL authentication is enabled.
+  ## Defaults to "" for password-only authentication (no protocol username, authenticates as default).
+  ## Set a username for a named ACL user; authentication still requires a password or existing password secret.
   redisSentinelUser: ""
   ## connections.redisSentinelExistingSecret Name of existing secret to use for Redis Sentinel password
   ## Must contain the key specified in `connections.redisSentinelSecretKeyName`
@@ -103,8 +105,8 @@ connections:
   ## If set to, it takes priority over the `connections.redisSentinelExistingSecret`
   ## The value in this parameter overrides the value set in the `optionsSentinel` object in `local.json` if you add custom configuration file
   redisSentinelPassword: ""
-  ## connections.redisSentinelNoPass Defines whether to use a Redis Sentinel auth without a password
-  ## If Sentinel does not require ACL authentication, set the value to `true`; the Sentinel user and password are then omitted.
+  ## connections.redisSentinelNoPass Omit Sentinel credentials when true, independently of Redis-node authentication.
+  ## When false, a password or existing password secret is required; the username is optional.
   redisSentinelNoPass: true
   ## connections.amqpType Defines the AMQP server type
   ## Possible values are `rabbitmq` or `activemq`

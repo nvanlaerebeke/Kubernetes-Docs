@@ -31,7 +31,7 @@ data:
   REDIS_SERVER_TLS: {{ .Values.connections.redisTLS | quote }}
   REDIS_SENTINEL_TLS: {{ .Values.connections.redisSentinelTLS | quote }}
   REDIS_CONNECTOR_NAME: redis
-  {{- if not .Values.connections.redisNoPass }}
+  {{- if and (not .Values.connections.redisNoPass) .Values.connections.redisUser }}
   REDIS_SERVER_USER: {{ .Values.connections.redisUser | quote }}
   {{- end }}
   REDIS_SERVER_DB_NUM: {{ .Values.connections.redisDBNum | quote }}
@@ -41,7 +41,7 @@ data:
   {{- if .Values.connections.redisSentinelNodes }}
   REDIS_SENTINEL_NODES: {{ join " " .Values.connections.redisSentinelNodes }}
   REDIS_SENTINEL_GROUP_NAME: {{ .Values.connections.redisSentinelGroupName }}
-  {{- if not .Values.connections.redisSentinelNoPass }}
+  {{- if and (not .Values.connections.redisSentinelNoPass) .Values.connections.redisSentinelUser }}
   REDIS_SENTINEL_USER: {{ .Values.connections.redisSentinelUser | quote }}
   {{- end }}
   {{- end }}

@@ -19,7 +19,7 @@ elif [[ -n "${REDIS_SENTINEL_NODES:-}" ]]; then
 elif [[ -n "${REDIS_CLUSTER_NODES:-}" ]]; then
   topology=cluster
 else
-  fail "Redis Sentinel or Cluster nodes must be set"
+  topology=standalone
 fi
 
 # The orchestrated entrypoint is the component that turns Helm's environment
@@ -32,13 +32,30 @@ render_config() {
     "$@" /usr/local/bin/docker-entrypoint.sh docservice
 }
 
+# Validate the username for this case, which may override the deployed one.
+# An omitted username selects the default account through password-only AUTH.
+check_auth() {
+  local name="$1" options="$2" authenticated="$3" username="$4" user_key="${5:-username}"
+  printf '%s' "$options" | jq -e \
+    --argjson authenticated "$authenticated" --arg username "$username" --arg user_key "$user_key" '
+    if $authenticated then
+      (.password | type == "string" and length > 0) and
+      (if $username != "" then .[$user_key] == $username else has($user_key) | not end)
+    else
+      (has($user_key) or has("password")) | not
+    end
+  ' >/dev/null || fail "$name: credentials do not match the expected authentication"
+}
+
 check_config() {
   local name="$1"
   local node_config="$2"
   local node_auth="$3"
   local sentinel_auth="$4"
-  local node_tls="${5:-${REDIS_SERVER_TLS:-false}}"
-  local sentinel_tls="${6:-${REDIS_SENTINEL_TLS:-false}}"
+  local node_user="${5-${REDIS_SERVER_USER:-}}"
+  local sentinel_user="${6-${REDIS_SENTINEL_USER:-}}"
+  local node_tls="${7:-${REDIS_SERVER_TLS:-false}}"
+  local sentinel_tls="${8:-${REDIS_SENTINEL_TLS:-false}}"
   local scheme=redis
   [[ "$node_tls" != true ]] || scheme=rediss
 
@@ -55,6 +72,14 @@ check_config() {
   (.services.CoAuthoring.server.editorStatStorage // $data_storage) == $stat_storage and
   .services.CoAuthoring.redis.name == "redis"
 ' >/dev/null || fail "$name: NODE_CONFIG does not select the native Redis backend"
+
+  # The orchestrated entrypoint uses user/db for standalone options, and
+  # username/database for Sentinel and Cluster node-redis options.
+  check_auth "$name: standalone/fallback" \
+    "$(printf '%s' "$node_config" | jq '.services.CoAuthoring.redis.options')" "$node_auth" "$node_user" user
+  printf '%s' "$node_config" | jq -e --arg db "$REDIS_SERVER_DB_NUM" '
+    .services.CoAuthoring.redis.options.db == $db
+  ' >/dev/null || fail "$name: standalone/fallback database is incorrect"
 
   if [[ "$topology" == sentinel ]]; then
     printf '%s' "$node_config" | jq -e --arg nodes "$REDIS_SENTINEL_NODES" --arg db "$REDIS_SERVER_DB_NUM" '
@@ -76,29 +101,16 @@ check_config() {
     (.sentinelClientOptions | check_tls($sentinel_tls))
     ' >/dev/null || fail "$name: Redis node and Sentinel TLS options are incorrect"
 
-    if [[ "$node_auth" == true ]]; then
-      printf '%s' "$node_config" | jq -e '
-      .services.CoAuthoring.redis.optionsSentinel.nodeClientOptions |
-      has("username") and has("password") and has("database")
-      ' >/dev/null || fail "$name: authenticated Redis node options are incomplete"
-    else
-      printf '%s' "$node_config" | jq -e '
-      .services.CoAuthoring.redis.optionsSentinel.nodeClientOptions |
-      (has("username") or has("password")) | not
-      ' >/dev/null || fail "$name: unauthenticated Redis node options contain credentials"
-    fi
-
-    if [[ "$sentinel_auth" == true ]]; then
-      printf '%s' "$node_config" | jq -e '
-      .services.CoAuthoring.redis.optionsSentinel.sentinelClientOptions |
-      has("username") and has("password")
-      ' >/dev/null || fail "$name: authenticated Sentinel options are incomplete"
-    else
+    check_auth "$name: Redis nodes" \
+      "$(printf '%s' "$node_config" | jq '.services.CoAuthoring.redis.optionsSentinel.nodeClientOptions')" "$node_auth" "$node_user"
+    check_auth "$name: Sentinel" \
+      "$(printf '%s' "$node_config" | jq '.services.CoAuthoring.redis.optionsSentinel.sentinelClientOptions')" "$sentinel_auth" "$sentinel_user"
+    if [[ "$sentinel_auth" != true ]]; then
       printf '%s' "$node_config" | jq -e '
       (.services.CoAuthoring.redis.optionsSentinel.sentinelClientOptions | del(.socket)) == {}
       ' >/dev/null || fail "$name: unauthenticated Sentinel options are not empty"
     fi
-  else
+  elif [[ "$topology" == cluster ]]; then
     printf '%s' "$node_config" | jq -e --arg nodes "$REDIS_CLUSTER_NODES" --arg scheme "$scheme" '
     (.services.CoAuthoring.redis.optionsCluster.rootNodes |
       map(.url) == ($nodes | split(" ") | map($scheme + "://" + .))) and
@@ -111,17 +123,13 @@ check_config() {
     .rejectUnauthorized != false
     ' >/dev/null || fail "$name: Cluster TLS options are incorrect"
 
-    if [[ "$node_auth" == true ]]; then
-      printf '%s' "$node_config" | jq -e '
-      .services.CoAuthoring.redis.optionsCluster.defaults |
-      has("username") and has("password")
-      ' >/dev/null || fail "$name: authenticated Cluster options are incomplete"
-    else
-      printf '%s' "$node_config" | jq -e '
-      .services.CoAuthoring.redis.optionsCluster.defaults |
-      (has("username") or has("password")) | not
-      ' >/dev/null || fail "$name: unauthenticated Cluster options contain credentials"
-    fi
+    check_auth "$name: Cluster" \
+      "$(printf '%s' "$node_config" | jq '.services.CoAuthoring.redis.optionsCluster.defaults')" "$node_auth" "$node_user"
+  else
+    printf '%s' "$node_config" | jq -e '
+      ((.services.CoAuthoring.redis.optionsSentinel // {}) | length) == 0 and
+      ((.services.CoAuthoring.redis.optionsCluster // {}) | length) == 0
+    ' >/dev/null || fail "$name: standalone configuration contains a topology"
   fi
 }
 
@@ -133,19 +141,23 @@ check_config "deployed environment" "$node_config" \
 # Exercise the supported authentication matrix using the native environment
 # names. These checks only render NODE_CONFIG; the regular test-ds hook checks
 # the actual Redis/Sentinel and DocService connections.
-if [[ "$topology" == sentinel ]]; then
-  check_config "unauthenticated Redis and Sentinel" \
-    "$(render_config REDIS_SERVER_USER= REDIS_SERVER_PWD= REDIS_SENTINEL_USER= REDIS_SENTINEL_PWD=)" false false
-  check_config "authenticated Redis and unauthenticated Sentinel" \
-    "$(render_config REDIS_SERVER_USER=default REDIS_SERVER_PWD=redis-test REDIS_SENTINEL_USER= REDIS_SENTINEL_PWD=)" true false
-  check_config "authenticated Redis and Sentinel" \
-    "$(render_config REDIS_SERVER_USER=default REDIS_SERVER_PWD=redis-test REDIS_SENTINEL_USER=sentinel-test REDIS_SENTINEL_PWD=sentinel-test)" true true
-else
-  check_config "unauthenticated Cluster" \
-    "$(render_config REDIS_SERVER_USER= REDIS_SERVER_PWD=)" false false
-  check_config "authenticated Cluster" \
-    "$(render_config REDIS_SERVER_USER=default REDIS_SERVER_PWD=redis-test)" true false
-fi
+for node_auth in none password acl; do
+  node_user='' node_password=''
+  [[ "$node_auth" == none ]] || node_password=redis-test
+  [[ "$node_auth" != acl ]] || node_user=redis-test-user
+  sentinel_cases=(none)
+  [[ "$topology" != sentinel ]] || sentinel_cases+=(password acl)
+  for sentinel_auth in "${sentinel_cases[@]}"; do
+    sentinel_user='' sentinel_password=''
+    [[ "$sentinel_auth" == none ]] || sentinel_password=sentinel-test
+    [[ "$sentinel_auth" != acl ]] || sentinel_user=sentinel-test-user
+    check_config "Redis auth=$node_auth, Sentinel auth=$sentinel_auth" \
+      "$(render_config "REDIS_SERVER_USER=$node_user" "REDIS_SERVER_PWD=$node_password" \
+        "REDIS_SENTINEL_USER=$sentinel_user" "REDIS_SENTINEL_PWD=$sentinel_password")" \
+      "$([[ "$node_auth" != none ]] && echo true || echo false)" \
+      "$([[ "$sentinel_auth" != none ]] && echo true || echo false)" "$node_user" "$sentinel_user"
+  done
+done
 
 # Exercise TLS independently, including the entrypoint's empty/unset defaults.
 # Authentication is omitted here so TLS-only Sentinel options are also checked.
@@ -156,7 +168,7 @@ for node_tls in true false empty unset; do
     [[ "$sentinel_tls" == unset ]] || tls_env+=("REDIS_SENTINEL_TLS=${sentinel_tls/empty/}")
     check_config "Redis TLS=$node_tls, Sentinel TLS=$sentinel_tls" \
       "$(render_config "${tls_env[@]}" REDIS_SERVER_USER= REDIS_SERVER_PWD= REDIS_SENTINEL_USER= REDIS_SENTINEL_PWD=)" \
-      false false "$node_tls" "$sentinel_tls"
+      false false "" "" "$node_tls" "$sentinel_tls"
   done
 done
 

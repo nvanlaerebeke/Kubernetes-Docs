@@ -22,9 +22,6 @@ Validate editor storage modes and their Redis topology requirements.
   {{- fail "Redis Cluster and Redis Sentinel nodes cannot be configured together." -}}
 {{- end -}}
 {{- if and .Values.connections.redisSentinelNodes (not .Values.connections.redisSentinelNoPass) -}}
-  {{- if empty .Values.connections.redisSentinelUser -}}
-    {{- fail "Authenticated Redis Sentinel requires connections.redisSentinelUser." -}}
-  {{- end -}}
   {{- if and (empty .Values.connections.redisSentinelPassword) (empty .Values.connections.redisSentinelExistingSecret) -}}
     {{- fail "Authenticated Redis Sentinel requires connections.redisSentinelPassword or connections.redisSentinelExistingSecret." -}}
   {{- end -}}

@@ -465,6 +465,13 @@ available for those settings.
 
 #### Redis authentication secrets
 
+Redis/Valkey supports password-only authentication and named ACL users for
+standalone, Sentinel-discovered nodes, and Cluster. An omitted username authenticates as the `default` user. The chart keeps
+`connections.redisUser: default` and `connections.redisSentinelUser: ""` as
+its defaults. Set `connections.redisUser: ""` to omit the Redis-node protocol
+username for password-only authentication, or supply a username for a named
+ACL user. The username is emitted only when nonempty and that authentication is enabled.
+
 When using an existing Redis Secret, set `connections.redisExistingSecret`.
 The Secret must contain the key configured by
 `connections.redisSecretKeyName`, which defaults to `redis-password`:
@@ -481,14 +488,16 @@ stringData:
 
 Redis Sentinel authentication has two independent layers: Redis-node
 authentication and Sentinel authentication. If both are protected, configure
-both `connections.redisExistingSecret`/`connections.redisUser` and
-`connections.redisSentinelExistingSecret`/`connections.redisSentinelUser`.
+both `connections.redisExistingSecret` and
+`connections.redisSentinelExistingSecret`, or supply the passwords directly
+with `connections.redisPassword` and `connections.redisSentinelPassword`.
 The Redis Secret supplies the node password, while the Sentinel Secret
-supplies the Sentinel ACL password.
+supplies the Sentinel password. Each authenticated layer requires a password
+or an existing password Secret; usernames are optional.
 
-For the Sentinel ACL credentials, set
-`connections.redisSentinelExistingSecret` and
-`connections.redisSentinelUser`. The Secret must contain the key configured by
+For password-only Sentinel authentication, leave
+`connections.redisSentinelUser: ""`. Set it to a named ACL user when needed,
+as in the example below. The Secret must contain the key configured by
 `connections.redisSentinelSecretKeyName`, which defaults to
 `sentinel-password`:
 
@@ -512,7 +521,7 @@ stringData:
 
 The Secrets must be in the namespace where the chart is installed. Set
 `connections.redisNoPass: true` when Redis nodes do not require a password, or
-`connections.redisSentinelNoPass: true` when Sentinel does not require ACL
+`connections.redisSentinelNoPass: true` when Sentinel does not require
 credentials. Only the corresponding credentials are omitted; the other layer
 can still remain authenticated.
 
@@ -529,21 +538,21 @@ can still remain authenticated.
 | `connections.redisHost`                                     | Redis host, or the reachable startup/readiness fallback endpoint when a topology is configured                                                                                 | `redis-master`                                                                            |
 | `connections.redisPort`                                     | Redis port used with `connections.redisHost` for the standalone/startup fallback endpoint                                                                                       | `6379`                                                                                    |
 | `connections.redisTLS`                                     | Enable TLS for standalone Redis, Cluster, and Sentinel-discovered Redis nodes. Requires a DocumentServer image with TLS entrypoint support.                                | `false`                                                                                   |
-| `connections.redisUser`                                     | Redis [user](https://redis.io/docs/management/security/acl/) name. Omitted when `connections.redisNoPass` is `true`                                                            | `default`                                                                                |
+| `connections.redisUser`                                     | Redis [user](https://redis.io/docs/management/security/acl/) name. Set to `""` for password-only authentication as `default`. Omitted when empty or `connections.redisNoPass` is `true` | `default`                                                                                |
 | `connections.redisDBNum`                                    | Number of the redis logical database to be [selected](https://redis.io/commands/select/). The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file | `0`                                           |
 | `connections.redisClusterNodes`                             | List of nodes in the Redis cluster. There is no need to specify every node in the cluster, 3 should be enough. You can specify multiple values. It must be specified in the `host:port` format | `[]`                                                                      |
 | `connections.redisPassword`                                 | The password set for the Redis account. If set to, it takes priority over the `connections.redisExistingSecret`. The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file | `""`                   |
 | `connections.redisSecretKeyName`                            | The name of the key that contains the Redis user password                                                                                                                      | `redis-password`                                                                          |
 | `connections.redisExistingSecret`                           | Name of existing secret to use for Redis passwords. Must contain the key specified in `connections.redisSecretKeyName`. The password from this secret overrides password set in the `options` object in `local.json` | `redis`                                             |
-| `connections.redisNoPass`                                   | Defines whether to use a Redis auth without a password. If the connection to Redis server does not require a password, set the value to `true`                                 | `false`                                                                                   |
+| `connections.redisNoPass`                                   | If `true`, omit Redis-node credentials independently of Sentinel authentication. If `false`, a node password or existing password Secret is required; the username is optional. | `false`                                                                                   |
 | `connections.redisSentinelNodes`                            | List of Redis Sentinel Nodes. Sentinel mode is enabled when this list is non-empty. There is no need to specify every node, 3 should be enough. It must use the `host:port` format | `[]`                             |
 | `connections.redisSentinelGroupName`                        | Name of the Sentinel-monitored Redis group.                                                                                                                                    | `mymaster`                                                                                |
 | `connections.redisSentinelTLS`                             | Enable TLS for Sentinel discovery independently of `connections.redisTLS`. Requires a DocumentServer image with TLS entrypoint support.                                    | `false`                                                                                   |
-| `connections.redisSentinelUser`                             | Redis Sentinel ACL user name. Required together with a password when Sentinel authentication is enabled.                                                                        | `""`                                                                                     |
+| `connections.redisSentinelUser`                             | Optional Redis Sentinel ACL user name. Empty omits the protocol username for password-only authentication as `default`. Omitted when `connections.redisSentinelNoPass` is `true`. | `""`                                                                                     |
 | `connections.redisSentinelExistingSecret`                   | Name of existing secret to use for Redis Sentinel password. Must contain the key specified in `connections.redisSentinelSecretKeyName`. The password overrides `optionsSentinel` in `local.json` | `""`              |
 | `connections.redisSentinelSecretKeyName`                    | The name of the key that contains the Redis Sentinel user password. If you set a password in `redisSentinelPassword`, a secret will be automatically created, the key name of which will be the value set here | `sentinel-password`                                       |
 | `connections.redisSentinelPassword`                         | The password set for the Redis Sentinel account. If set, it takes priority over `connections.redisSentinelExistingSecret` and overrides the `optionsSentinel` password in `local.json` | `""`                                     |
-| `connections.redisSentinelNoPass`                           | If `true`, omit Sentinel ACL credentials. If `false`, both `connections.redisSentinelUser` and a Sentinel password are required.                                                  | `true`                                                                                    |
+| `connections.redisSentinelNoPass`                           | If `true`, omit Sentinel credentials independently of Redis-node authentication. If `false`, a Sentinel password or existing password Secret is required; the username is optional. | `true`                                                                                    |
 | `connections.amqpType`                                      | Defines the AMQP server type. Possible values are `rabbitmq` or `activemq`                                                                                                     | `rabbitmq`                                                                                |
 | `connections.amqpHost`                                      | The IP address or the name of the AMQP server                                                                                                                                  | `rabbitmq`                                                                                |
 | `connections.amqpPort`                                      | The port for the connection to AMQP server                                                                                                                                     | `5672`                                                                                    |
@@ -952,7 +961,7 @@ can still remain authenticated.
 | `customResources.job.containerSecurityContext.enabled`      | Enable security context for the Custom Resources container                                                                                                                     | `false`                                                                                   |
 | `customResources.job.resources.requests`                    | The requested resources for the job Custom Resources container                                                                                                                 | `{}`                                                                                      |
 | `customResources.job.resources.limits`                      | The resources limits for the job Custom Resources container                                                                                                                    | `{}`                                                                                      |
-| `tests.enabled`                                             | Enable launch/dependency test resources. `helm test` checks Redis, the other dependencies, the native Sentinel `NODE_CONFIG` (when Sentinel storage is selected), and the DocumentServer health endpoint; any failed check fails the test. | `true`                                                                     |
+| `tests.enabled`                                             | Enable launch/dependency test resources. `helm test` checks Redis, the other dependencies, the native Redis `NODE_CONFIG` (when standalone, Sentinel, or Cluster storage is selected), and the DocumentServer health endpoint; any failed check fails the test. | `true`                                                                     |
 | `tests.annotations`                                         | Defines annotations that will be additionally added to Test Pod. If set to, it takes priority over the `commonAnnotations`                                                     | `{}`                                                                                      |
 | `tests.customPodAntiAffinity`                               | Prohibiting the scheduling of Test Pod relative to other Pods containing the specified labels on the same node                                                                 | `{}`                                                                                      |
 | `tests.podAffinity`                                         | Defines [Pod affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity) rules for Test Pod scheduling by nodes relative to other Pods | `{}`                                                                 |
