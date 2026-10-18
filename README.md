@@ -459,9 +459,44 @@ images do not support these flags. `REDIS_SERVER_TLS=true` enables
 
 The flags accept `true`/`false`; unset or empty environment values behave as
 `false` without injecting TLS options. TLS does not change the configured
-ports, and certificate verification stays enabled. Custom certificates and
-mutual TLS are outside these values; existing mounted configuration remains
-available for those settings.
+ports, and certificate verification stays enabled. Client certificates for
+mutual TLS still use the existing mounted application configuration.
+
+For private CAs, configure one shared Secret containing a PEM CA bundle:
+
+```yaml
+connections:
+  redisTLS: true
+  redisSentinelTLS: true  # Enable only if Sentinel also uses TLS.
+  redisCAExistingSecret: redis-ca
+  redisCASecretKeyName: ca.crt
+```
+
+Create `redis-ca` in the release namespace, for example:
+
+```sh
+kubectl create secret generic redis-ca --from-file=ca.crt=./ca-bundle.pem --namespace <release-namespace>
+```
+
+The chart mounts this same bundle read-only into Docservice, Converter,
+Adminpanel (when enabled), and the dependency connectivity test pod. No extra
+volume or environment configuration is needed. If Redis and Sentinel use
+different CAs, include both issuers in the bundle. The shared configuration is
+active when either TLS flag is enabled; without it, the existing trust defaults
+are retained. Certificate verification remains required.
+
+Application containers use `NODE_EXTRA_CA_CERTS`, which extends Node.js trust
+for outbound TLS connections. An explicit `socket.ca` in custom application
+configuration takes precedence, as does an existing `NODE_EXTRA_CA_CERTS` in a
+component's `extraEnvVars`. Restart application pods after updating the CA
+bundle so Node.js reloads it.
+
+For test-specific trust, `tests.extraEnvVars` can override
+`REDIS_SERVER_CA_CERTS` (standalone, Cluster, or Sentinel-discovered Redis) and
+`REDIS_SENTINEL_CA_CERTS` (Sentinel discovery). Use `tests.extraVolumes` and
+`tests.extraVolumeMounts` to mount any additional bundles. Each path is used
+only when its corresponding TLS flag is enabled. The test pod does not inherit
+unrelated application mounts or `local.json` settings.
 
 #### Redis authentication secrets
 
@@ -538,6 +573,8 @@ can still remain authenticated.
 | `connections.redisHost`                                     | Redis host, or the reachable startup/readiness fallback endpoint when a topology is configured                                                                                 | `redis-master`                                                                            |
 | `connections.redisPort`                                     | Redis port used with `connections.redisHost` for the standalone/startup fallback endpoint                                                                                       | `6379`                                                                                    |
 | `connections.redisTLS`                                     | Enable TLS for standalone Redis, Cluster, and Sentinel-discovered Redis nodes. Requires a DocumentServer image with TLS entrypoint support.                                | `false`                                                                                   |
+| `connections.redisCAExistingSecret`                        | Existing Secret containing a PEM CA bundle, shared by application containers and the connectivity test when Redis or Sentinel TLS is enabled                                 | `""`                                                                                      |
+| `connections.redisCASecretKeyName`                         | Key containing the PEM CA bundle in `connections.redisCAExistingSecret`                                                                                                       | `ca.crt`                                                                                  |
 | `connections.redisUser`                                     | Redis [user](https://redis.io/docs/management/security/acl/) name. Set to `""` for password-only authentication as `default`. Omitted when empty or `connections.redisNoPass` is `true` | `default`                                                                                |
 | `connections.redisDBNum`                                    | Number of the redis logical database to be [selected](https://redis.io/commands/select/). The value in this parameter overrides the value set in the `options` object in `local.json` if you add custom configuration file | `0`                                           |
 | `connections.redisClusterNodes`                             | List of nodes in the Redis cluster. There is no need to specify every node in the cluster, 3 should be enough. You can specify multiple values. It must be specified in the `host:port` format | `[]`                                                                      |
@@ -969,6 +1006,9 @@ can still remain authenticated.
 | `tests.nodeSelector`                                        | Node labels for Test Pod assignment. If set to, it takes priority over the `nodeSelector`                                                                                      | `{}`                                                                                      |
 | `tests.tolerations`                                         | Tolerations for Test Pod assignment. If set to, it takes priority over the `tolerations`                                                                                       | `[]`                                                                                      |
 | `tests.initContainers`                                      | Defines containers that run before Test container in the Pod                                                                                                                   | `[]`                                                                                      |
+| `tests.extraEnvVars`                                        | Extra environment variables for the dependency connectivity test container, including `REDIS_SERVER_CA_CERTS` and `REDIS_SENTINEL_CA_CERTS` PEM bundle paths                     | `[]`                                                                                      |
+| `tests.extraVolumes`                                        | Extra volumes for the dependency connectivity test Pod, such as CA certificate Secrets                                                                                         | `[]`                                                                                      |
+| `tests.extraVolumeMounts`                                   | Extra volume mounts for the dependency connectivity test container                                                                                                             | `[]`                                                                                      |
 | `tests.image.repository`                                    | Test container image name                                                                                                                                                      | `ghcr.io/euro-office/cluster-utils`                                                                   |
 | `tests.image.tag`                                           | Test container image tag. If set to, it takes priority over the `images.tag`                                                                                                   | `""`                                                                                      |
 | `tests.image.pullPolicy`                                    | Test container image pull policy                                                                                                                                               | `IfNotPresent`                                                                            |

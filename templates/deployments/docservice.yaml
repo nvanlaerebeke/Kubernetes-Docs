@@ -154,6 +154,7 @@ spec:
         {{- with .Values.docservice.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{ include "ds.redis.ca.volume" . | nindent 8 }}
       terminationGracePeriodSeconds: {{ .Values.docservice.terminationGracePeriodSeconds }}
       {{- if .Values.docservice.hostAliases }}
       hostAliases: {{- toYaml .Values.docservice.hostAliases | nindent 8 }}
@@ -317,6 +318,7 @@ spec:
                 name: {{ template "ds.rabbitmq.secretName" . }}
                 key: {{ .Values.connections.amqpSecretKeyName }}
           {{ include "ds.redis.env" . | nindent 10 }}
+          {{ include "ds.redis.ca.env" (dict "context" . "extraEnvVars" .Values.docservice.extraEnvVars) | nindent 10 }}
           {{- with .Values.docservice.extraEnvVars }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
@@ -383,3 +385,4 @@ spec:
           {{- with .Values.docservice.extraVolumeMounts }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
+          {{ include "ds.redis.ca.mount" . | nindent 10 }}

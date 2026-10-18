@@ -204,6 +204,61 @@ Return Redis Sentinel password
 {{- end }}
 {{- end -}}
 
+{{/* Share Redis CA trust between the application containers and the connectivity hook. */}}
+{{- define "ds.redis.ca.enabled" -}}
+{{- $tls := or .Values.connections.redisTLS .Values.connections.redisSentinelTLS -}}
+{{- if and .Values.connections.redisCAExistingSecret $tls -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{- define "ds.redis.ca.volume" -}}
+{{- if include "ds.redis.ca.enabled" . }}
+- name: redis-ca-certificates
+  secret:
+    secretName: {{ tpl .Values.connections.redisCAExistingSecret . | quote }}
+    items:
+    - key: {{ .Values.connections.redisCASecretKeyName | quote }}
+      path: ca.crt
+{{- end }}
+{{- end -}}
+
+{{- define "ds.redis.ca.mount" -}}
+{{- if include "ds.redis.ca.enabled" . }}
+- name: redis-ca-certificates
+  mountPath: /etc/redis-ca-certificates
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "ds.redis.ca.env" -}}
+{{- $overrides := dict }}
+{{- range .extraEnvVars }}
+{{- $_ := set $overrides .name true }}
+{{- end }}
+{{- if and (include "ds.redis.ca.enabled" .context) (not (hasKey $overrides "NODE_EXTRA_CA_CERTS")) }}
+- name: NODE_EXTRA_CA_CERTS
+  value: /etc/redis-ca-certificates/ca.crt
+{{- end }}
+{{- end -}}
+
+{{- define "ds.redis.ca.testEnv" -}}
+{{- if include "ds.redis.ca.enabled" . }}
+{{- $overrides := dict }}
+{{- range .Values.tests.extraEnvVars }}
+{{- $_ := set $overrides .name true }}
+{{- end }}
+{{- if and .Values.connections.redisTLS (not (hasKey $overrides "REDIS_SERVER_CA_CERTS")) }}
+- name: REDIS_SERVER_CA_CERTS
+  value: /etc/redis-ca-certificates/ca.crt
+{{- end }}
+{{- if and .Values.connections.redisSentinelTLS (not (hasKey $overrides "REDIS_SENTINEL_CA_CERTS")) }}
+- name: REDIS_SENTINEL_CA_CERTS
+  value: /etc/redis-ca-certificates/ca.crt
+{{- end }}
+{{- end }}
+{{- end -}}
+
 {{/*
 Get the info auth password secret
 */}}

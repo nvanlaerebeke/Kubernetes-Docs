@@ -4,18 +4,23 @@ import subprocess
 import time
 import logging
 
+
+def redis_tls_options(prefix):
+    if os.environ.get(f'{prefix}_TLS') != 'true':
+        return {}
+    options = {'ssl': True, 'ssl_cert_reqs': 'required'}
+    ca_certs = os.environ.get(f'{prefix}_CA_CERTS')
+    if ca_certs:
+        options['ssl_ca_certs'] = ca_certs
+    return options
+
+
 redisHost = os.environ.get('REDIS_SERVER_HOST')
 redisPort = os.environ.get('REDIS_SERVER_PORT')
 redisUser = os.environ.get('REDIS_SERVER_USER')
 redisPassword = os.environ.get('REDIS_SERVER_PWD')
-redisTLSOptions = (
-    {'ssl': True, 'ssl_cert_reqs': 'required'}
-    if os.environ.get('REDIS_SERVER_TLS') == 'true' else {}
-)
-redisSentinelTLSOptions = (
-    {'ssl': True, 'ssl_cert_reqs': 'required'}
-    if os.environ.get('REDIS_SENTINEL_TLS') == 'true' else {}
-)
+redisTLSOptions = redis_tls_options('REDIS_SERVER')
+redisSentinelTLSOptions = redis_tls_options('REDIS_SENTINEL')
 redisSentinelUser = os.environ.get('REDIS_SENTINEL_USER')
 redisSentinelPassword = os.environ.get('REDIS_SENTINEL_PWD')
 redisDBNum = os.environ.get('REDIS_SERVER_DB_NUM')
@@ -382,12 +387,13 @@ def total_status():
         sys.exit(1)
 
 
-init_logger('test')
-logger_test_ds = logging.getLogger('test.ds')
-check_redis()
-check_db()
-check_mq()
-if storageS3 == 'false':
-    check_dir_access()
-get_ds_status()
-total_status()
+if __name__ == '__main__':
+    init_logger('test')
+    logger_test_ds = logging.getLogger('test.ds')
+    check_redis()
+    check_db()
+    check_mq()
+    if storageS3 == 'false':
+        check_dir_access()
+    get_ds_status()
+    total_status()
